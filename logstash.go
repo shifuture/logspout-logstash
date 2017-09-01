@@ -182,7 +182,7 @@ func (a *LogstashAdapter) Stream(logstream chan *router.Message) {
         if ok,_ := regexp.MatchString("^\\s{3,}", data["message"].(string)); ok {
             // multi line
             if _, e := dataBuffer["message"]; e {
-                dataBuffer["message"] = append(dataBuffer["message"].([]byte), []byte{0x0A,0x0D}...)
+                dataBuffer["message"] = append(dataBuffer["message"].([]byte), []byte{0x20,0x20}...)
                 dataBuffer["message"] = append(dataBuffer["message"].([]byte), data["message"].([]byte)...)
             } else {
                 dataBuffer = data
