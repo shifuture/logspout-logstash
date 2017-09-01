@@ -111,14 +111,16 @@ func (a *LogstashAdapter) Stream(logstream chan *router.Message) {
     var dataBuffer map[string]interface{}
     var sendData = func(data map[string]interface{}) {
         if _, e := data["message"]; !e {
-            return nil
+            return
         }
+		var js []byte
+		var err error
 
         // Return the JSON encoding
         if js, err = json.Marshal(data); err != nil {
             // Log error message and continue parsing next line, if marshalling fails
             log.Println("logstash: could not marshal JSON:", err)
-            return nil
+            return
         }
 
         // To work with tls and tcp transports via json_lines codec
@@ -158,7 +160,6 @@ func (a *LogstashAdapter) Stream(logstream chan *router.Message) {
 		tags := GetContainerTags(m.Container, a)
 		fields := GetLogstashFields(m.Container, a)
 
-		var js []byte
 		var data map[string]interface{}
 		var err error
 
@@ -178,10 +179,10 @@ func (a *LogstashAdapter) Stream(logstream chan *router.Message) {
 		data["tags"] = tags
 
 		// judge message
-        if regexp.MatchString("^\\s{3,}", data["message"]) {
+        if regexp.MatchString("^\\s{3,}", string(data["message"])) {
             // multi line
             if _, e := dataBuffer["message"]; e {
-                dataBuffer["message"] += "\n" + data["message"]
+                dataBuffer["message"] += "\n" + string(data["message"])
             } else {
                 dataBuffer = data
             }
