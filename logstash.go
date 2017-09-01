@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"regexp"
 	"time"
 
 	"github.com/fsouza/go-dockerclient"
@@ -103,8 +104,40 @@ func GetLogstashFields(c *docker.Container, a *LogstashAdapter) map[string]strin
 	return fields
 }
 
+
 // Stream implements the router.LogAdapter interface.
 func (a *LogstashAdapter) Stream(logstream chan *router.Message) {
+
+    var dataBuffer map[string]interface{}
+    var sendData = func(data map[string]interface{}) {
+        if _, e := data["message"]; !e {
+            return nil
+        }
+
+        // Return the JSON encoding
+        if js, err = json.Marshal(data); err != nil {
+            // Log error message and continue parsing next line, if marshalling fails
+            log.Println("logstash: could not marshal JSON:", err)
+            return nil
+        }
+
+        // To work with tls and tcp transports via json_lines codec
+        js = append(js, byte('\n'))
+
+        for {
+            _, err := a.conn.Write(js)
+
+            if err == nil {
+                break
+            }
+
+            if os.Getenv("RETRY_SEND") == "" {
+                log.Fatal("logstash: could not write:", err)
+            } else {
+                time.Sleep(2 * time.Second)
+            }
+        }
+    }
 
 	for m := range logstream {
 
@@ -144,30 +177,23 @@ func (a *LogstashAdapter) Stream(logstream chan *router.Message) {
 		data["stream"] = m.Source
 		data["tags"] = tags
 
-		// Return the JSON encoding
-		if js, err = json.Marshal(data); err != nil {
-			// Log error message and continue parsing next line, if marshalling fails
-			log.Println("logstash: could not marshal JSON:", err)
-			continue
-		}
-
-		// To work with tls and tcp transports via json_lines codec
-		js = append(js, byte('\n'))
-
-		for {
-			_, err := a.conn.Write(js)
-
-			if err == nil {
-				break
-			}
-
-			if os.Getenv("RETRY_SEND") == "" {
-				log.Fatal("logstash: could not write:", err)
-			} else {
-				time.Sleep(2 * time.Second)
-			}
-		}
+		// judge message
+        if regexp.MatchString("^\\s{3,}", data["message"]) {
+            // multi line
+            if _, e := dataBuffer["message"]; e {
+                dataBuffer["message"] += "\n" + data["message"]
+            } else {
+                dataBuffer = data
+            }
+            continue
+        } else {
+            // single line
+            sendData(dataBuffer)
+            dataBuffer = data
+        }
 	}
+	// send left message
+	sendData(dataBuffer)
 }
 
 type DockerInfo struct {
