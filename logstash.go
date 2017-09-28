@@ -108,7 +108,7 @@ func GetLogstashFields(c *docker.Container, a *LogstashAdapter) map[string]strin
 // Stream implements the router.LogAdapter interface.
 func (a *LogstashAdapter) Stream(logstream chan *router.Message) {
 
-    var dataBuffer map[string]interface{}
+    var dataBuffer map[string]interface{} 
     var sendData = func(data map[string]interface{}) {
         if _, e := data["message"]; !e {
             return
@@ -179,7 +179,7 @@ func (a *LogstashAdapter) Stream(logstream chan *router.Message) {
 		data["tags"] = tags
 
 		// judge message
-        if _,ok := data["message"]; ok {
+        if _,e := data["message"]; e {
             if ok,_ := regexp.MatchString("^(\\t+|\\s{2,})", data["message"].(string)); ok {
                 // multi line
                 if _, e := dataBuffer["message"]; e {
@@ -188,11 +188,15 @@ func (a *LogstashAdapter) Stream(logstream chan *router.Message) {
                     dataBuffer = data
                 }
                 continue
+            } else {
+                // single line
+                sendData(dataBuffer)
+                dataBuffer = data
             }
+        } else {
+            sendData(dataBuffer)
+            dataBuffer = make(map[string]interface{})
         }
-        // single line
-        sendData(dataBuffer)
-        dataBuffer = data
 	}
 	// send left message
 	sendData(dataBuffer)
