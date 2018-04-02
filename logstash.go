@@ -183,11 +183,11 @@ func (a *LogstashAdapter) Stream(logstream chan *router.Message) {
         if _,e := data["message"]; e {
             if ok,_ := regexp.MatchString("^\\$\\$\\$\\$", data["message"].(string)); ok {
                 multilineTag = !multiLineTag
-                continue;
+                continue
             }
             if multilineTag {
                 dataBuffer["message"] = dataBuffer["message"].(string) + "\n" + data["message"].(string)
-                continue;
+                continue
             }
             if ok,_ := regexp.MatchString("^(\\t+|\\s{2,})", data["message"].(string)); ok {
                 // multi line
