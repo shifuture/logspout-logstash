@@ -141,6 +141,7 @@ func (a *LogstashAdapter) Stream(logstream chan *router.Message) {
         }
     }
 
+    multilineTag := false
 	for m := range logstream {
 
 		dockerInfo := DockerInfo{
@@ -180,6 +181,14 @@ func (a *LogstashAdapter) Stream(logstream chan *router.Message) {
 
 		// judge message
         if _,e := data["message"]; e {
+            if ok,_ := regexp.MatchString("^$$$$", data["message"].(string)); ok {
+                multilineTag = !multiLineTag
+                continue;
+            }
+            if multilineTag {
+                dataBuffer["message"] = dataBuffer["message"].(string) + "\n" + data["message"].(string)
+                continue;
+            }
             if ok,_ := regexp.MatchString("^(\\t+|\\s{2,})", data["message"].(string)); ok {
                 // multi line
                 if _, e := dataBuffer["message"]; e {
